@@ -143,9 +143,49 @@ void createFile(char *information) {
 
 }
 
-void readFile() {
+void readFile(char * info) {
+    const char filePath[75] = "/home/stu/jbuxton21/FinalProject/disks/disk";
+
+    int part = -1;
+    char file[25];
+
+    for (int i = 0; i < strlen(info); i++) {
+        if (info[i] != ' ') {
+            file[i] = info[i];
+        }
+        else {
+            i++;
+            char temp[2];
+            temp[0] = info[i];
+            part = atoi(temp);
+        }
+    }
+
+    printf("Part: %d\n", part);
+    printf("File: %s\n", file);
+
+    if (part != -1) {
+        char path[100];
+        sprintf(path, "%s%d", filePath, part);
+        strcat(path, "/");
+        strcat(path, file);
+
+        FILE *inputStream = fopen(path, "r");
+
+        char buffer[256] = "\n";
+        char result[256] = "\n";
 
 
+        if (inputStream) {
+            while (fgets(buffer, 256, inputStream) != NULL) {
+                strcat(result, buffer);
+            }
+        }
+
+        printf("Read from file: %s\n", result);
+        fclose(inputStream);
+
+    }
 
     printf("We are reading a file here\n");
 }
@@ -204,7 +244,7 @@ void * processClientRequest(void * request) {
         createFile(information);
     }
     else if( strcmp(command, "read") == 0){
-        readFile();
+        readFile(information);
     }
     else if ( strcmp(command, "delete") == 0){
         deleteFile(information);
