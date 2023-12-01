@@ -10,7 +10,7 @@
 #include <semaphore.h>
 #include <sys/stat.h>
 
-#define RESOURCE_SERVER_PORT 1059 // Change this!
+#define RESOURCE_SERVER_PORT 1055 // Change this!
 #define BUF_SIZE 256
 
 // We make this a global so that we can refer to it in our signal handler
@@ -91,7 +91,7 @@ void createFile(char *information) {
 
     // Making the path for the mapping file and adding the filename
     char mappingPath[100];
-    strcpy(mappingPath, "/home/stu/tkmetich23/finalProject/mappings/");
+    strcpy(mappingPath, "/home/stu/jbuxton21/FinalProject/mappings/");
     strcat(mappingPath, filename);
     printf("%s\n", mappingPath);
 
@@ -102,7 +102,7 @@ void createFile(char *information) {
     int i;
     char rawDiskPath[50];
     char completeDiskPath[100];
-    strcpy(rawDiskPath, "/home/stu/tkmetich23/finalProject/disks/disk");
+    strcpy(rawDiskPath, "/home/stu/jbuxton21/FinalProject/disks/disk");
     for(i=0; i < partitions; i++){
         sprintf(completeDiskPath, "%s%d", rawDiskPath, i);
         fprintf(outputStream, "%d:%s/%s\n", i, completeDiskPath, filename);
@@ -145,10 +145,40 @@ void createFile(char *information) {
 
 void readFile() {
 
+
+
     printf("We are reading a file here\n");
 }
 
-void deleteFile() {
+void deleteFile(char * file) {
+    const char filePath[100] = "/home/stu/jbuxton21/FinalProject/disks/disk";
+    int check = 1;
+    int i = 0;
+
+    while (check == 1) {
+        char path[115];
+        char mappings[115] = "/home/stu/jbuxton21/FinalProject/mappings/";
+
+        sprintf(path, "%s%d", filePath, i);
+        strcat(path, "/");
+        strcat(path, file);
+
+        strcat(mappings, file);
+        if (access(path, F_OK) == 0) {
+            remove(mappings);
+        }
+        else {
+            printf("Mapping doesn't exist\n");
+        }
+
+        if (access(path, F_OK) == 0) {
+            remove(path);
+            i++;
+        }
+        else {
+            check = 0;
+        }
+    }
 
     printf("We are deleting a file here\n");
 }
@@ -177,7 +207,7 @@ void * processClientRequest(void * request) {
         readFile();
     }
     else if ( strcmp(command, "delete") == 0){
-        deleteFile();
+        deleteFile(information);
     }
     else {
         printf("Invalid commnad\n");
@@ -258,4 +288,3 @@ int main(int argc, char *argv[]) {
 
     }
 }
-~           
