@@ -9,8 +9,9 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/stat.h>
+#include <ctype.h>
 
-#define RESOURCE_SERVER_PORT 1055 // Change this!
+#define RESOURCE_SERVER_PORT 1058 // Change this!
 #define BUF_SIZE 256
 
 // We make this a global so that we can refer to it in our signal handler
@@ -21,7 +22,7 @@ pthread_mutex_t lock;
 // Struct to hold the information to pass to the threads to partition the text to the disks
 struct PartitionInfo {
     char rawPartitionPath[50];
-    char filename[20];
+    char filename[50];
     char text[256];
     int stringIndex;
     int count;
@@ -44,7 +45,7 @@ void * partitionWithThreads(void * arg) {
 
     struct PartitionInfo * partitionInfo = ((struct PartitionInfo *)arg);
 
-    char partitionPath[100];
+    char partitionPath[200];
     char word[20];
     int wordsRead;
 
@@ -84,14 +85,14 @@ void createFile(char *information) {
     printf("We are creating a mapping file here "); //DELETE
 
     // Breaking up the create request from the user into seperate variables
-    char filename[20];
+    char filename[50];
     int partitions;
     char text[256];
     sscanf(information, "%s %d %[^\n]", filename, &partitions, text);
 
     // Making the path for the mapping file and adding the filename
-    char mappingPath[100];
-    strcpy(mappingPath, "/home/stu/jbuxton21/FinalProject/mappings/");
+    char mappingPath[200];
+    strcpy(mappingPath, "/home/stu/tkmetich23/finalProject/mappings/");
     strcat(mappingPath, filename);
     printf("%s\n", mappingPath);
 
@@ -101,8 +102,8 @@ void createFile(char *information) {
     // Write each of the partion paths to the mapping file and create the disks if they don't exist
     int i;
     char rawDiskPath[50];
-    char completeDiskPath[100];
-    strcpy(rawDiskPath, "/home/stu/jbuxton21/FinalProject/disks/disk");
+    char completeDiskPath[200];
+    strcpy(rawDiskPath, "/home/stu/tkmetich23/finalProject/disks/disk");
     for(i=0; i < partitions; i++){
         sprintf(completeDiskPath, "%s%d", rawDiskPath, i);
         fprintf(outputStream, "%d:%s/%s\n", i, completeDiskPath, filename);
@@ -134,7 +135,7 @@ void createFile(char *information) {
     }
 
     // Waiting for all the Threads to join
-    for (int i = 0; i < partitions; ++i) {
+    for (int i = 0; i < 4; ++i) {
         pthread_join(partitionThreads[i], NULL);
         printf("Thread %d joined\n", i);
     }
@@ -143,61 +144,155 @@ void createFile(char *information) {
 
 }
 
-void readFile(char * info) {
-    const char filePath[75] = "/home/stu/jbuxton21/FinalProject/disks/disk";
+char * partitionRead(char *information) {
+    char filename[50];
+    int partitionNum;
+    sscanf(information, "%s %d", filename, &partitionNum);
 
-    int part = -1;
-    char file[25];
+    char mappingPath[100] = "/home/stu/tkmetich23/finalProject/mappings/";
+    strcat(mappingPath, filename);
 
-    for (int i = 0; i < strlen(info); i++) {
-        if (info[i] != ' ') {
-            file[i] = info[i];
-        }
-        else {
-            i++;
-            char temp[2];
-            temp[0] = info[i];
-            part = atoi(temp);
+    FILE *mappingFile = fopen(mappingPath, "r");
+
+    // Reads lines until the correct partition filepath is read
+    char buffer[256];
+    if (mappingFile != NULL) {
+        for(int i = 0; i < partitionNum; i++){
+            fgets(buffer, sizeof(buffer), mappingFile);
         }
     }
 
-    printf("Part: %d\n", part);
-    printf("File: %s\n", file);
+    fclose(mappingFile);
 
-    if (part != -1) {
-        char path[100];
-        sprintf(path, "%s%d", filePath, part);
-        strcat(path, "/");
-        strcat(path, file);
+    char partitionPath[100];
+    sscanf(buffer, "%*[^:]:%s", partitionPath);
 
-        FILE *inputStream = fopen(path, "r");
+    FILE *partitionFile = fopen(partitionPath, "r");
 
-        char buffer[256] = "\n";
-        char result[256] = "\n";
+    char fileContents[100] = "";
 
+    if (partitionFile != NULL) {
+        while(fgets(buffer, sizeof(buffer), partitionFile) != NULL) {
+            strcat(fileContents, buffer);
+        }
+    }
 
-        if (inputStream) {
-            while (fgets(buffer, 256, inputStream) != NULL) {
-                strcat(result, buffer);
-            }
+    fclose(partitionFile);
+
+    char * contents = malloc(strlen(fileContents)+1);
+    strcpy(contents, fileContents);
+    contents[strlen(contents)] = '\0';
+
+    return contents;
+}
+
+void * wholeFileRead(char *information) {
+    char filename[50];
+    sscanf(information, "%s", filename);
+
+    char mappingPath[100] = "/home/stu/tkmetich23/finalProject/mappings/";
+    strcat(mappingPath, filename);
+
+    FILE *mappingFile = fopen(mappingPath, "r");
+
+    // Gets the last line of the file
+    char buffer[256];
+    char lastLine[256];
+    if (mappingFile != NULL) {
+        while(fgets(buffer, sizeof(buffer), mappingFile) != NULL) {
+            strcpy(lastLine, buffer);
+        }
+    }
+
+    // Gets the number of partitions from the last line of the file and convert it to and int
+    char strNumPartitions[10] = "";
+    int i = 0;
+    while(isdigit(lastLine[i])){
+        strcat(strNumPartitions, &lastLine[i]);
+        i++;
+    }
+    int numPartitions = (atoi(strNumPartitions)) + 1;
+
+    // Reset the pointer to the file at the beginning
+    fseek(mappingFile, 0, SEEK_SET);
+
+    char partitionPath[100];
+    int mappingLine = 0;
+    int fileLine = 0;
+    char fileStrLine[100];
+    char assembledString[256] = "";
+    int done = 0;
+
+    while(1){
+        // Grabs the partition path from mapping file
+        fgets(buffer, sizeof(buffer), mappingFile);
+        sscanf(buffer, "%*[^:]:%s", partitionPath);
+        // Increment to keep track of when to reset to the top of the mapping file
+        mappingLine++;
+
+        FILE *partitionFile = fopen(partitionPath, "r");
+
+        // Get the string from the current line
+        for (int i = 0; i<=fileLine; i++){
+           if (fgets(buffer, sizeof(buffer), partitionFile) != NULL){
+               strcpy(fileStrLine, buffer);
+           }
+           else {
+               done = 1;
+               break;
+           }
         }
 
-        printf("Read from file: %s\n", result);
-        fclose(inputStream);
+        fclose(partitionFile);
+
+        if(done == 1) {
+            break;
+        }
+
+        // Append the latest string grabbed to the final string
+        strcat(assembledString, fileStrLine);
+
+        if(mappingLine >= numPartitions) {
+            fileLine++;
+            mappingLine = 0;
+            fseek(mappingFile, 0, SEEK_SET);
+        }
 
     }
 
+    fclose(mappingFile);
+
+    printf("Final String: %s\n", assembledString);
+
+
+    char * contents = malloc(strlen(assembledString)+1);
+    strcpy(contents, assembledString);
+    return contents;
+}
+
+char * readFile(char *information) {
     printf("We are reading a file here\n");
+
+    printf("Information: %s\n", information);
+
+    if ( isdigit(information[strlen(information)-1]) ) {
+        return partitionRead(information);
+    }
+    else {
+        return wholeFileRead(information);
+    }
+
+
 }
 
 void deleteFile(char * file) {
-    const char filePath[100] = "/home/stu/jbuxton21/FinalProject/disks/disk";
+    const char filePath[100] = "/home/stu/tkmetich23/finalProject/disks/disk";
     int check = 1;
     int i = 0;
 
     while (check == 1) {
         char path[115];
-        char mappings[115] = "/home/stu/jbuxton21/FinalProject/mappings/";
+        char mappings[115] = "/home/stu/tkmetich23/finalProject/mappings/";
 
         sprintf(path, "%s%d", filePath, i);
         strcat(path, "/");
@@ -220,7 +315,6 @@ void deleteFile(char * file) {
         }
     }
 
-    printf("We are deleting a file here\n");
 }
 
 
@@ -231,20 +325,23 @@ void * processClientRequest(void * request) {
     char sendLine[BUF_SIZE];
 
     read(connectionToClient, receiveLine, BUF_SIZE);
-
-    printf("We got: %s\n", receiveLine); //DELETE
+    printf(": %s\n", receiveLine); // DELETE
 
     char command[10];
-    char information[256];
-    sscanf(receiveLine, "%s %[^\n]", command, information);
+    char information[256] = "";
+    sscanf(receiveLine, "%9s %255[^\n]", command, information);
 
     printf("Command: %s\n", command); //DELETE
-    printf("information: %s\n", information);
+    printf("information: %s\n", information); // DELETE
+
+    // Check which command was received
     if ( strcmp(command, "create") == 0){
         createFile(information);
     }
     else if( strcmp(command, "read") == 0){
-        readFile(information);
+        char * fileContents = readFile(information);
+        write(connectionToClient, fileContents, strlen(fileContents));
+        free(fileContents);
     }
     else if ( strcmp(command, "delete") == 0){
         deleteFile(information);
@@ -253,33 +350,8 @@ void * processClientRequest(void * request) {
         printf("Invalid commnad\n");
     }
 
-
     bzero(&receiveLine, sizeof(receiveLine));
     close(connectionToClient);
-
-
-
-/*
-
-    int bytesReadFromClient = 0;
-    // Read the request from the client
-    while ( (bytesReadFromClient = read(connectionToClient, receiveLine, BUF_SIZE)) > 0) {
-        // Need to put a NULL string terminator at end
-        receiveLine[bytesReadFromClient] = 0;
-
-        // Show what client sent
-        printf("Received: %s\n", receiveLine);
-
-        // Print text out to buffer, and then write it to client (connfd)
-        snprintf(sendLine, sizeof(sendLine), "true");
-
-        printf("%s Sending s\n", sendLine);
-        write(connectionToClient, sendLine, strlen(sendLine));
-
-        // Zero out the receive line so we do not get artifacts from before
-        bzero(&receiveLine, sizeof(receiveLine));
-        close(connectionToClient);
-    }*/
 
 
 }
