@@ -99,7 +99,7 @@ void createFile(char *information) {
     // Open mapping file for the given filename
     FILE *outputStream = fopen(mappingPath, "w");
 
-    // Write each of the partion paths to the mapping file and create the disks if they don't exist
+    // Write each of the partition paths to the mapping file and create the disks if they don't exist
     int i;
     char rawDiskPath[50];
     char completeDiskPath[200];
@@ -204,7 +204,7 @@ void * wholeFileRead(char *information) {
         }
     }
 
-    // Gets the number of partitions from the last line of the file and convert it to and int
+    // Gets the number of partitions from the last line of the file and convert it to an int
     char strNumPartitions[10] = "";
     int i = 0;
     while(isdigit(lastLine[i])){
