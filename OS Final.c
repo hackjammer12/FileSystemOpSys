@@ -135,7 +135,7 @@ void createFile(char *information) {
     }
 
     // Waiting for all the Threads to join
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < partitions; ++i) {
         pthread_join(partitionThreads[i], NULL);
         printf("Thread %d joined\n", i);
     }
